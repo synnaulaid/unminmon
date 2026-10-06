@@ -278,6 +278,53 @@
             color: var(--muted);
         }
 
+        .earnings-section {
+            margin-bottom: 16px;
+        }
+
+        .earnings-heading {
+            margin: 20px 0 12px;
+        }
+
+        .earnings-heading h2 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        .earnings-heading p {
+            margin: 5px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .miner-details {
+            margin-bottom: 16px;
+        }
+
+        .miner-details-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .miner-detail {
+            min-width: 0;
+        }
+
+        .miner-detail-label {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .miner-detail-value {
+            display: block;
+            margin-top: 6px;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 650;
+            overflow-wrap: anywhere;
+        }
+
         /* =====================================================
            GRID
         ===================================================== */
@@ -579,6 +626,10 @@
                 grid-template-columns: 1fr;
             }
 
+            .miner-details-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
         }
 
         @media (max-width: 700px) {
@@ -603,6 +654,10 @@
             }
 
             .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .miner-details-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -810,6 +865,67 @@
 
             </div>
 
+        </section>
+
+
+        <section class="earnings-section">
+            <div class="earnings-heading">
+                <h2>Estimated Mining Earnings</h2>
+                <p id="earningsBasis">
+                    Coin estimates · collecting balance data
+                </p>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Estimated / hour</div>
+                    <div id="earningsHour" class="stat-value">—</div>
+                    <div class="stat-description">Based on observed balance growth</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Estimated / day</div>
+                    <div id="earningsDay" class="stat-value">—</div>
+                    <div class="stat-description">Based on observed balance growth</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Estimated / 30 days</div>
+                    <div id="earningsMonth" class="stat-value">—</div>
+                    <div class="stat-description">Based on observed balance growth</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Estimated / 365 days</div>
+                    <div id="earningsYear" class="stat-value">—</div>
+                    <div class="stat-description">Based on observed balance growth</div>
+                </div>
+            </div>
+        </section>
+
+
+        <section class="panel miner-details">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Miner Details</div>
+                    <div class="panel-subtitle">Metrics reported by Unmineable</div>
+                </div>
+            </div>
+            <div class="panel-body miner-details-grid">
+                <div class="miner-detail">
+                    <span class="miner-detail-label">Amount mined</span>
+                    <strong id="amountMined" class="miner-detail-value">—</strong>
+                </div>
+                <div class="miner-detail">
+                    <span class="miner-detail-label">Referral amount</span>
+                    <strong id="amountReferral" class="miner-detail-value">—</strong>
+                </div>
+                <div class="miner-detail">
+                    <span class="miner-detail-label">Reward ratio</span>
+                    <strong id="rewardRatio" class="miner-detail-value">—</strong>
+                </div>
+                <div class="miner-detail">
+                    <span class="miner-detail-label">Algorithm / hashrate</span>
+                    <strong id="algorithmDetails" class="miner-detail-value">—</strong>
+                </div>
+            </div>
         </section>
 
 
@@ -1086,6 +1202,23 @@
             undefined,
             {
                 maximumFractionDigits: 8
+            }
+        );
+    }
+
+
+    function formatCoinValue(value) {
+
+        const number = Number(value);
+
+        if (!Number.isFinite(number)) {
+            return "—";
+        }
+
+        return number.toLocaleString(
+            undefined,
+            {
+                maximumFractionDigits: 12
             }
         );
     }
@@ -1499,6 +1632,64 @@
                 totalPaid === undefined
                     ? "—"
                     : formatNumber(totalPaid);
+
+
+        const coin = data.balance_asset || "coin";
+        const earnings = data.earnings || {};
+
+        for (const period of ["hour", "day", "month", "year"]) {
+            const value = earnings[period];
+            document
+                .getElementById(`earnings${period[0].toUpperCase()}${period.slice(1)}`)
+                .textContent =
+                    value === null || value === undefined
+                        ? "Collecting..."
+                        : `${formatCoinValue(value)} ${coin}`;
+        }
+
+        document
+            .getElementById("earningsBasis")
+            .textContent =
+                earnings.hour === null || earnings.hour === undefined
+                    ? `Waiting for measurable ${coin} balance growth`
+                    : `Projection in ${coin} from observed balance growth`;
+
+        const formatAssetAmount = value =>
+            value === null || value === undefined
+                ? "—"
+                : `${formatCoinValue(value)} ${coin}`;
+
+        document
+            .getElementById("amountMined")
+            .textContent =
+                formatAssetAmount(data.amount_mined);
+
+        document
+            .getElementById("amountReferral")
+            .textContent =
+                formatAssetAmount(data.amount_referral);
+
+        document
+            .getElementById("rewardRatio")
+            .textContent =
+                data.reward_ratio === null || data.reward_ratio === undefined
+                    ? "—"
+                    : `${data.reward_ratio}×`;
+
+        const algorithmRates = data.algorithm_hashrates || {};
+        const algorithmNames = Object.entries(algorithmRates)
+            .map(([name, rate]) => `${name}: ${rate}`);
+        const algorithmCount = data.algorithm_count;
+        const algorithmSummary = algorithmNames.length
+            ? algorithmNames.join(", ")
+            : data.reward_algorithm || "";
+
+        document
+            .getElementById("algorithmDetails")
+            .textContent =
+                algorithmCount === null || algorithmCount === undefined
+                    ? algorithmSummary || "—"
+                    : `${algorithmCount}${algorithmSummary ? ` · ${algorithmSummary}` : ""}`;
 
 
         document

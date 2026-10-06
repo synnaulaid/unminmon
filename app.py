@@ -53,6 +53,18 @@ state = {
     "balance": None,
     "balance_asset": None,
     "balance_asset_logo": None,
+    "amount_mined": None,
+    "amount_referral": None,
+    "reward_ratio": None,
+    "reward_algorithm": None,
+    "algorithm_count": None,
+    "algorithm_hashrates": {},
+    "earnings": {
+        "hour": None,
+        "day": None,
+        "month": None,
+        "year": None,
+    },
     "total_paid": None,
 }
 
@@ -63,6 +75,13 @@ history = {
 }
 
 events = []
+
+earnings_tracker = {
+    "asset": None,
+    "started_at": None,
+    "last_balance": None,
+    "earned": Decimal("0"),
+}
 
 # SSE clients
 clients = set()
@@ -352,7 +371,7 @@ def find_value(data, keys):
     return None
 
 
-def extract_balance(summary_response, assets_response):
+def extract_miner_metrics(summary_response, assets_response):
     assets_data = (
         assets_response.get("data", {})
         if isinstance(assets_response, dict)
@@ -362,26 +381,43 @@ def extract_balance(summary_response, assets_response):
     if isinstance(assets, dict):
         assets = list(assets.values())
 
+    asset = None
     if isinstance(assets, list) and assets:
         active_assets = [
             asset for asset in assets
             if isinstance(asset, dict) and asset.get("is_active") is not False
         ]
         asset = (active_assets or assets)[0]
-        if isinstance(asset, dict):
-            balance = find_value(asset, ("amount", "balance", "amount_mined"))
-            if balance is not None:
-                return (
-                    balance,
-                    asset.get("coin") or asset.get("coin_canonical"),
-                    asset.get("logo"),
-                )
 
-    balance = find_value(
-        summary_response,
-        ("balance", "available_balance", "total_balance"),
+    asset = asset if isinstance(asset, dict) else {}
+    summary_data = (
+        summary_response.get("data", {})
+        if isinstance(summary_response, dict)
+        else {}
     )
-    return balance, None, None
+    summary_raw = summary_data.get("raw", {}) if isinstance(summary_data, dict) else {}
+    balance = find_value(asset, ("amount", "balance", "amount_mined"))
+    if balance is None:
+        balance = find_value(
+            summary_response,
+            ("balance", "available_balance", "total_balance"),
+        )
+
+    return {
+        "balance": balance,
+        "balance_asset": asset.get("coin") or asset.get("coin_canonical"),
+        "balance_asset_logo": asset.get("logo"),
+        "amount_mined": asset.get("amount_mined"),
+        "amount_referral": asset.get("amount_referral"),
+        "reward_ratio": asset.get("reward_ratio"),
+        "reward_algorithm": asset.get("reward_algorithm"),
+        "algorithm_count": summary_raw.get("algorithm_count"),
+        "algorithm_hashrates": summary_raw.get("hr", {}),
+        "total_paid": find_value(
+            summary_response,
+            ("total_paid", "paid", "totalPaid"),
+        ),
+    }
 
 
 def balance_increase(previous, current):
@@ -397,6 +433,45 @@ def balance_increase(previous, current):
         return None
 
     return format(increase.normalize(), "f")
+
+
+def estimate_earnings(balance, asset, observed_at=None):
+    try:
+        current_balance = Decimal(str(balance))
+    except (InvalidOperation, TypeError, ValueError):
+        return {"hour": None, "day": None, "month": None, "year": None}
+
+    observed_at = time.time() if observed_at is None else observed_at
+
+    if earnings_tracker["started_at"] is None or earnings_tracker["asset"] != asset:
+        earnings_tracker.update({
+            "asset": asset,
+            "started_at": observed_at,
+            "last_balance": current_balance,
+            "earned": Decimal("0"),
+        })
+        return {"hour": None, "day": None, "month": None, "year": None}
+
+    increase = current_balance - earnings_tracker["last_balance"]
+    if increase > 0:
+        earnings_tracker["earned"] += increase
+
+    earnings_tracker["last_balance"] = current_balance
+    elapsed = Decimal(str(observed_at - earnings_tracker["started_at"]))
+    earned = earnings_tracker["earned"]
+
+    if elapsed <= 0 or earned <= 0:
+        return {"hour": None, "day": None, "month": None, "year": None}
+
+    hourly = earned * Decimal("3600") / elapsed
+    daily = hourly * Decimal("24")
+
+    return {
+        "hour": float(hourly),
+        "day": float(daily),
+        "month": float(daily * Decimal("30")),
+        "year": float(daily * Decimal("365")),
+    }
 
 
 # ============================================================
@@ -566,11 +641,6 @@ def poll_unmineable():
             # OPTIONAL DASHBOARD DATA
             # ------------------------------------------------
 
-            balance = None
-            balance_asset = None
-            balance_asset_logo = None
-            total_paid = None
-
             summary_response = {}
             assets_response = {}
 
@@ -584,13 +654,9 @@ def poll_unmineable():
             except Exception:
                 pass
 
-            balance, balance_asset, balance_asset_logo = extract_balance(
+            miner_metrics = extract_miner_metrics(
                 summary_response,
                 assets_response,
-            )
-            total_paid = find_value(
-                summary_response,
-                ("total_paid", "paid", "totalPaid"),
             )
 
             # ------------------------------------------------
@@ -598,6 +664,34 @@ def poll_unmineable():
             # ------------------------------------------------
 
             previous_state = get_state()
+            for key in (
+                "balance",
+                "balance_asset",
+                "balance_asset_logo",
+                "amount_mined",
+                "amount_referral",
+                "reward_ratio",
+                "reward_algorithm",
+                "algorithm_count",
+                "total_paid",
+            ):
+                if miner_metrics[key] is None:
+                    miner_metrics[key] = previous_state.get(key)
+
+            if not miner_metrics["algorithm_hashrates"]:
+                miner_metrics["algorithm_hashrates"] = previous_state[
+                    "algorithm_hashrates"
+                ]
+
+            balance = miner_metrics["balance"]
+            balance_asset = miner_metrics["balance_asset"]
+            balance_asset_logo = miner_metrics["balance_asset_logo"]
+            total_paid = miner_metrics["total_paid"]
+            earnings = (
+                estimate_earnings(balance, balance_asset)
+                if balance is not None
+                else previous_state["earnings"]
+            )
 
             set_state(
                 connected=True,
@@ -617,6 +711,13 @@ def poll_unmineable():
                 balance=balance,
                 balance_asset=balance_asset,
                 balance_asset_logo=balance_asset_logo,
+                amount_mined=miner_metrics["amount_mined"],
+                amount_referral=miner_metrics["amount_referral"],
+                reward_ratio=miner_metrics["reward_ratio"],
+                reward_algorithm=miner_metrics["reward_algorithm"],
+                algorithm_count=miner_metrics["algorithm_count"],
+                algorithm_hashrates=miner_metrics["algorithm_hashrates"],
+                earnings=earnings,
                 total_paid=total_paid,
             )
 
@@ -670,6 +771,13 @@ def poll_unmineable():
                 "balance": balance,
                 "balance_asset": balance_asset,
                 "balance_asset_logo": balance_asset_logo,
+                "amount_mined": miner_metrics["amount_mined"],
+                "amount_referral": miner_metrics["amount_referral"],
+                "reward_ratio": miner_metrics["reward_ratio"],
+                "reward_algorithm": miner_metrics["reward_algorithm"],
+                "algorithm_count": miner_metrics["algorithm_count"],
+                "algorithm_hashrates": miner_metrics["algorithm_hashrates"],
+                "earnings": earnings,
                 "total_paid": total_paid,
             }
 
@@ -752,6 +860,13 @@ def api_status():
             "balance": state["balance"],
             "balance_asset": state["balance_asset"],
             "balance_asset_logo": state["balance_asset_logo"],
+            "amount_mined": state["amount_mined"],
+            "amount_referral": state["amount_referral"],
+            "reward_ratio": state["reward_ratio"],
+            "reward_algorithm": state["reward_algorithm"],
+            "algorithm_count": state["algorithm_count"],
+            "algorithm_hashrates": state["algorithm_hashrates"],
+            "earnings": state["earnings"],
             "total_paid": state["total_paid"],
 
             "account": state["account"],
