@@ -1,5 +1,8 @@
 # unminmon
 [![image](ss/overview.jpeg)](ss/overview.jpeg)
+
+Reference: <a href="https://unmineable.com/api"> https://unmineable.com/api</a>
+
 ## Docker
 
 1. Copy `.env.example` to `.env` and set your Unmineable API key and secret.
@@ -19,3 +22,5 @@ PAYOUT_MINIMUMS=LTC:<minimum>,DOGE:<minimum>
 ```
 
 Replace each placeholder with that coin's actual minimum payout amount, then restart the monitor. The dashboard shows progress to the threshold and marks payout complete when the balance drops after reaching 100%.
+
+
