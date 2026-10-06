@@ -26,7 +26,6 @@ API_SECRET = os.getenv("UNMINEABLE_API_SECRET", "").strip()
 
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "10"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "360"))
-EVENT_LIMIT = int(os.getenv("EVENT_LIMIT", "100"))
 
 app = Flask(__name__)
 
@@ -88,9 +87,6 @@ def add_event(event_type, message, data=None):
 
     with state_lock:
         events.append(event)
-
-        if len(events) > EVENT_LIMIT:
-            del events[:-EVENT_LIMIT]
 
     broadcast({
         "event": "log",
@@ -279,6 +275,49 @@ def normalize_worker(worker):
         "agent": worker.get("agent"),
         "last": worker.get("last"),
     }
+
+
+def detect_worker_events(previous_workers, current_workers):
+    def index_workers(workers):
+        indexed = {}
+        for index, worker in enumerate(workers):
+            key = worker.get("uuid") or worker.get("name") or f"worker-{index}"
+            indexed[key] = worker
+        return indexed
+
+    previous = index_workers(previous_workers)
+    current = index_workers(current_workers)
+    detected = []
+
+    for key, worker in current.items():
+        name = worker.get("name") or key
+        old_worker = previous.get(key)
+
+        if old_worker is None:
+            status = "online" if worker["online"] else "offline"
+            detected.append((
+                "worker",
+                f"Worker {name} detected and is {status}",
+                {"worker": key, "online": worker["online"]},
+            ))
+        elif old_worker["online"] != worker["online"]:
+            status = "online" if worker["online"] else "offline"
+            detected.append((
+                "worker",
+                f"Worker {name} is now {status}",
+                {"worker": key, "online": worker["online"]},
+            ))
+
+    for key, worker in previous.items():
+        if key not in current:
+            name = worker.get("name") or key
+            detected.append((
+                "worker",
+                f"Worker {name} removed",
+                {"worker": key, "online": worker["online"]},
+            ))
+
+    return detected
 
 
 # ============================================================
@@ -600,6 +639,13 @@ def poll_unmineable():
                         },
                     )
 
+            if previous_state["last_update"] is not None:
+                for event_type, message, data in detect_worker_events(
+                    previous_state["workers"],
+                    workers,
+                ):
+                    add_event(event_type, message, data)
+
             add_history(
                 total_hashrate,
                 balance
@@ -838,7 +884,7 @@ if __name__ == "__main__":
     print(f" API       : {API_BASE}")
     print(f" Poll      : {POLL_INTERVAL}s")
     print(f" History   : {HISTORY_LIMIT}")
-    print(f" Events    : {EVENT_LIMIT}")
+    print(" Events    : unlimited")
     print("=" * 60)
 
     start_background_thread()

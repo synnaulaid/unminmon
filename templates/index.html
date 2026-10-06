@@ -526,6 +526,10 @@
             color: var(--cyan);
         }
 
+        .event-row[data-type="worker"] .event-type {
+            color: var(--blue);
+        }
+
         .event-message {
             color: #cbd5e1;
             line-height: 1.45;
@@ -1633,10 +1637,6 @@
 
         row.append(timeCell, typeCell, messageCell);
         container.prepend(row);
-
-        while (container.children.length > 100) {
-            container.lastElementChild.remove();
-        }
     }
 
 
