@@ -1,5 +1,5 @@
 # unminmon
-[![image](ss/overview.png)](ss/overview.png)
+[![image](ss/overview.jpeg)](ss/overview.jpeg)
 ## Docker
 
 1. Copy `.env.example` to `.env` and set your Unmineable API key and secret.
