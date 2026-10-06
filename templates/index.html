@@ -426,6 +426,104 @@
             overflow-wrap: anywhere;
         }
 
+        .payout-panel {
+            margin-bottom: 16px;
+        }
+
+        .payout-status {
+            color: var(--yellow);
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .payout-panel[data-ready="true"] .payout-status {
+            color: var(--green);
+        }
+
+        .payout-summary {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+            align-items: end;
+            gap: 18px;
+            margin-bottom: 15px;
+        }
+
+        .payout-amount,
+        .payout-minimum,
+        .payout-percent {
+            display: block;
+            color: var(--text);
+            font-family: var(--mono);
+            font-weight: 600;
+            overflow-wrap: anywhere;
+        }
+
+        .payout-amount,
+        .payout-minimum {
+            margin-top: 5px;
+            font-size: 17px;
+        }
+
+        .payout-percent {
+            color: var(--green);
+            font-size: 22px;
+        }
+
+        .payout-label {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .payout-progress-track {
+            height: 10px;
+            overflow: hidden;
+            border: 1px solid #344432;
+            border-radius: 6px;
+            background: #1b261c;
+        }
+
+        .payout-progress-fill {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #8dcf51, var(--green), var(--cyan));
+            box-shadow: 0 0 14px rgba(183, 243, 107, 0.38);
+            transition: width 500ms ease;
+        }
+
+        .payout-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 10px;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 10px;
+        }
+
+        @media (max-width: 520px) {
+            .payout-summary {
+                grid-template-columns: minmax(0, 1fr) auto;
+            }
+
+            .payout-summary > :nth-child(2) {
+                grid-column: 1;
+            }
+
+            .payout-summary > :nth-child(3) {
+                grid-column: 2;
+                grid-row: 1 / span 2;
+                align-self: center;
+            }
+
+            .payout-footer {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+
         /* =====================================================
            GRID
         ===================================================== */
@@ -673,6 +771,10 @@
 
         .event-row[data-type="balance"] .event-type {
             color: var(--cyan);
+        }
+
+        .event-row[data-type="payout"] .event-type {
+            color: var(--green);
         }
 
         .event-row[data-type="worker"] .event-type {
@@ -1031,6 +1133,49 @@
 
             </div>
 
+        </section>
+
+
+        <section
+            id="payoutPanel"
+            class="panel payout-panel"
+            aria-labelledby="payoutTitle"
+        >
+            <div class="panel-header">
+                <div>
+                    <div id="payoutTitle" class="panel-title">Payout Progress</div>
+                    <div id="payoutAsset" class="panel-subtitle">Waiting for asset data</div>
+                </div>
+                <div id="payoutStatus" class="payout-status">Loading threshold</div>
+            </div>
+            <div class="panel-body">
+                <div class="payout-summary">
+                    <div>
+                        <span class="payout-label">Current balance</span>
+                        <strong id="payoutBalance" class="payout-amount">—</strong>
+                    </div>
+                    <div>
+                        <span class="payout-label">Minimum payout</span>
+                        <strong id="payoutMinimum" class="payout-minimum">—</strong>
+                    </div>
+                    <strong id="payoutPercent" class="payout-percent">—</strong>
+                </div>
+                <div
+                    id="payoutProgressTrack"
+                    class="payout-progress-track"
+                    role="progressbar"
+                    aria-label="Payout progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                >
+                    <div id="payoutProgressFill" class="payout-progress-fill"></div>
+                </div>
+                <div class="payout-footer">
+                    <span id="payoutRemaining">Set minimum payout per coin</span>
+                    <span id="payoutNote">Resets after payout is detected</span>
+                </div>
+            </div>
         </section>
 
 
@@ -1801,6 +1946,61 @@
 
 
         const coin = data.balance_asset || "coin";
+        const payout = data.payout || {};
+        const payoutPanel =
+            document.getElementById("payoutPanel");
+        const payoutTrack =
+            document.getElementById("payoutProgressTrack");
+        const payoutPercent = Number(payout.percent);
+        const hasPayoutMinimum =
+            Number.isFinite(Number(payout.minimum)) &&
+            payout.minimum !== null &&
+            payout.minimum !== undefined;
+
+        payoutPanel.dataset.ready = payout.ready ? "true" : "false";
+        document
+            .getElementById("payoutAsset")
+            .textContent = `${coin} asset payout`;
+        document
+            .getElementById("payoutBalance")
+            .textContent =
+                payout.balance === null || payout.balance === undefined
+                    ? "—"
+                    : `${formatCoinValue(payout.balance)} ${coin}`;
+        document
+            .getElementById("payoutMinimum")
+            .textContent = hasPayoutMinimum
+                ? `${formatCoinValue(payout.minimum)} ${coin}`
+                : "Not configured";
+
+        const progress = Number.isFinite(payoutPercent)
+            ? Math.max(0, Math.min(100, payoutPercent))
+            : 0;
+        document
+            .getElementById("payoutPercent")
+            .textContent = hasPayoutMinimum
+                ? `${progress.toFixed(1)}%`
+                : "—";
+        document
+            .getElementById("payoutProgressFill")
+            .style.width = `${progress}%`;
+        payoutTrack.setAttribute("aria-valuenow", progress.toFixed(1));
+
+        document
+            .getElementById("payoutStatus")
+            .textContent = !hasPayoutMinimum
+                ? "THRESHOLD NOT SET"
+                : payout.ready
+                    ? "100% · AWAITING PAYOUT"
+                    : "IN PROGRESS";
+        document
+            .getElementById("payoutRemaining")
+            .textContent = !hasPayoutMinimum
+                ? `Set PAYOUT_MINIMUMS=${coin}:<minimum> in .env`
+                : payout.ready
+                    ? "Minimum reached; waiting for balance reset"
+                    : `${formatCoinValue(payout.remaining)} ${coin} remaining`;
+
         const earnings = data.earnings || {};
 
         for (const period of ["hour", "day", "month", "year"]) {
@@ -1975,7 +2175,7 @@
         messageCell.textContent = event.message || "";
 
         const logoUrl = event.data && event.data.coin_logo;
-        if (eventType === "balance" && logoUrl) {
+        if (["balance", "payout"].includes(eventType) && logoUrl) {
             try {
                 const parsedLogoUrl = new URL(logoUrl);
                 if (

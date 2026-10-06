@@ -27,6 +27,29 @@ API_SECRET = os.getenv("UNMINEABLE_API_SECRET", "").strip()
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "10"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", "360"))
 
+
+def parse_payout_minimums(value):
+    minimums = {}
+    for entry in value.split(","):
+        coin, separator, amount = entry.strip().partition(":")
+        if not separator or not coin:
+            continue
+        try:
+            minimum = Decimal(amount.strip())
+        except (InvalidOperation, ValueError):
+            continue
+        if minimum.is_finite() and minimum > 0:
+            minimums[coin.strip().upper()] = minimum
+    return minimums
+
+
+PAYOUT_MINIMUMS = {
+    "LTC": Decimal("0.00075"),
+}
+PAYOUT_MINIMUMS.update(
+    parse_payout_minimums(os.getenv("PAYOUT_MINIMUMS", ""))
+)
+
 app = Flask(__name__)
 
 
@@ -64,6 +87,13 @@ state = {
         "day": None,
         "month": None,
         "year": None,
+    },
+    "payout": {
+        "balance": None,
+        "minimum": None,
+        "remaining": None,
+        "percent": None,
+        "ready": False,
     },
     "total_paid": None,
 }
@@ -407,6 +437,22 @@ def extract_miner_metrics(summary_response, assets_response):
         "balance": balance,
         "balance_asset": asset.get("coin") or asset.get("coin_canonical"),
         "balance_asset_logo": asset.get("logo"),
+        "payout_minimum": (
+            find_value(
+                asset,
+                (
+                    "payout_minimum",
+                    "minimum_payout",
+                    "min_payout",
+                    "min_amount",
+                    "minimum_amount",
+                    "payout_threshold",
+                ),
+            )
+            or PAYOUT_MINIMUMS.get(
+                str(asset.get("coin") or asset.get("coin_canonical") or "").upper()
+            )
+        ),
         "amount_mined": asset.get("amount_mined"),
         "amount_referral": asset.get("amount_referral"),
         "reward_ratio": asset.get("reward_ratio"),
@@ -418,6 +464,49 @@ def extract_miner_metrics(summary_response, assets_response):
             ("total_paid", "paid", "totalPaid"),
         ),
     }
+
+
+def calculate_payout_progress(balance, minimum):
+    try:
+        current = Decimal(str(balance))
+        target = Decimal(str(minimum))
+    except (InvalidOperation, TypeError, ValueError):
+        return {
+            "balance": None,
+            "minimum": None,
+            "remaining": None,
+            "percent": None,
+            "ready": False,
+        }
+
+    if not current.is_finite() or not target.is_finite() or target <= 0:
+        return {
+            "balance": float(current),
+            "minimum": None,
+            "remaining": None,
+            "percent": None,
+            "ready": False,
+        }
+
+    percent = min(Decimal("100"), max(Decimal("0"), current / target * 100))
+    remaining = max(Decimal("0"), target - current)
+    return {
+        "balance": float(current),
+        "minimum": float(target),
+        "remaining": float(remaining),
+        "percent": float(percent),
+        "ready": current >= target,
+    }
+
+
+def payout_was_completed(previous_balance, current_balance, previous_progress):
+    if not previous_progress.get("ready"):
+        return False
+
+    try:
+        return Decimal(str(current_balance)) < Decimal(str(previous_balance))
+    except (InvalidOperation, TypeError, ValueError):
+        return False
 
 
 def balance_increase(previous, current):
@@ -678,6 +767,12 @@ def poll_unmineable():
                 if miner_metrics[key] is None:
                     miner_metrics[key] = previous_state.get(key)
 
+            if (
+                miner_metrics["payout_minimum"] is None
+                and miner_metrics["balance_asset"] == previous_state["balance_asset"]
+            ):
+                miner_metrics["payout_minimum"] = previous_state["payout"]["minimum"]
+
             if not miner_metrics["algorithm_hashrates"]:
                 miner_metrics["algorithm_hashrates"] = previous_state[
                     "algorithm_hashrates"
@@ -687,6 +782,19 @@ def poll_unmineable():
             balance_asset = miner_metrics["balance_asset"]
             balance_asset_logo = miner_metrics["balance_asset_logo"]
             total_paid = miner_metrics["total_paid"]
+            payout = calculate_payout_progress(
+                balance,
+                miner_metrics["payout_minimum"],
+            )
+            previous_payout = previous_state.get("payout", {})
+            payout_completed = (
+                previous_state["balance_asset"] == balance_asset
+                and payout_was_completed(
+                    previous_state["balance"],
+                    balance,
+                    previous_payout,
+                )
+            )
             earnings = (
                 estimate_earnings(balance, balance_asset)
                 if balance is not None
@@ -711,6 +819,7 @@ def poll_unmineable():
                 balance=balance,
                 balance_asset=balance_asset,
                 balance_asset_logo=balance_asset_logo,
+                payout=payout,
                 amount_mined=miner_metrics["amount_mined"],
                 amount_referral=miner_metrics["amount_referral"],
                 reward_ratio=miner_metrics["reward_ratio"],
@@ -720,6 +829,19 @@ def poll_unmineable():
                 earnings=earnings,
                 total_paid=total_paid,
             )
+
+            if payout_completed:
+                add_event(
+                    "payout",
+                    f"Payout confirmed for {balance_asset or 'coin'}; progress reset",
+                    {
+                        "coin": balance_asset,
+                        "coin_logo": balance_asset_logo,
+                        "previous_balance": previous_state["balance"],
+                        "balance": balance,
+                        "minimum": previous_payout.get("minimum"),
+                    },
+                )
 
             if (
                 previous_state["balance"] is not None
@@ -771,6 +893,7 @@ def poll_unmineable():
                 "balance": balance,
                 "balance_asset": balance_asset,
                 "balance_asset_logo": balance_asset_logo,
+                "payout": payout,
                 "amount_mined": miner_metrics["amount_mined"],
                 "amount_referral": miner_metrics["amount_referral"],
                 "reward_ratio": miner_metrics["reward_ratio"],
@@ -860,6 +983,7 @@ def api_status():
             "balance": state["balance"],
             "balance_asset": state["balance_asset"],
             "balance_asset_logo": state["balance_asset_logo"],
+            "payout": state["payout"],
             "amount_mined": state["amount_mined"],
             "amount_referral": state["amount_referral"],
             "reward_ratio": state["reward_ratio"],
