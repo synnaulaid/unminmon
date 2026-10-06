@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Unmineable Monitor</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #070a0f;
+            --panel: #0d1118;
+            --panel2: #111720;
+            --border: #202936;
+
+            --text: #f1f5f9;
+            --muted: #8b98a8;
+
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #eab308;
+            --blue: #3b82f6;
+            --cyan: #06b6d4;
+            --purple: #8b5cf6;
+
+            --radius: 14px;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        .container {
+            width: min(1500px, calc(100% - 32px));
+            margin: auto;
+        }
+
+        /* =====================================================
+           HEADER
+        ===================================================== */
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+
+            background: rgba(7, 10, 15, 0.88);
+            backdrop-filter: blur(14px);
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-inner {
+            min-height: 72px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+
+            border-radius: 12px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background: linear-gradient(
+                135deg,
+                #1d4ed8,
+                #7c3aed
+            );
+
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .brand-title {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .brand-subtitle {
+            margin-top: 2px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .connection {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+
+            border: 1px solid var(--border);
+            background: var(--panel);
+
+            padding: 8px 13px;
+            border-radius: 999px;
+
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+
+            background: var(--yellow);
+
+            box-shadow:
+                0 0 0 4px rgba(234, 179, 8, 0.08);
+        }
+
+        .connection.connected {
+            color: #bbf7d0;
+        }
+
+        .connection.connected .connection-dot {
+            background: var(--green);
+
+            box-shadow:
+                0 0 0 4px rgba(34, 197, 94, 0.08);
+        }
+
+        .connection.disconnected {
+            color: #fecaca;
+        }
+
+        .connection.disconnected .connection-dot {
+            background: var(--red);
+
+            box-shadow:
+                0 0 0 4px rgba(239, 68, 68, 0.08);
+        }
+
+        /* =====================================================
+           MAIN
+        ===================================================== */
+
+        main {
+            padding: 28px 0 50px;
+        }
+
+        .page-title {
+            margin-bottom: 22px;
+        }
+
+        .page-title h1 {
+            margin: 0;
+
+            font-size: clamp(24px, 4vw, 34px);
+            letter-spacing: -0.8px;
+        }
+
+        .page-title p {
+            margin: 7px 0 0;
+
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        /* =====================================================
+           STATS
+        ===================================================== */
+
+        .stats {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 14px;
+
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(17, 23, 32, 0.95),
+                    rgba(13, 17, 24, 0.95)
+                );
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            padding: 19px;
+
+            min-width: 0;
+        }
+
+        .stat-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 10px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .stat-icon {
+            width: 32px;
+            height: 32px;
+
+            border-radius: 9px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background: var(--panel2);
+
+            color: #cbd5e1;
+        }
+
+        .stat-value {
+            margin-top: 15px;
+
+            font-size: clamp(22px, 3vw, 30px);
+            font-weight: 750;
+
+            letter-spacing: -0.7px;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .stat-description {
+            margin-top: 7px;
+
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* =====================================================
+           GRID
+        ===================================================== */
+
+        .grid {
+            display: grid;
+
+            grid-template-columns:
+                minmax(0, 2fr)
+                minmax(320px, 1fr);
+
+            gap: 16px;
+
+            margin-bottom: 16px;
+        }
+
+        .panel {
+            min-width: 0;
+
+            background: var(--panel);
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            overflow: hidden;
+        }
+
+        .panel-header {
+            min-height: 58px;
+
+            padding: 0 18px;
+
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            gap: 15px;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .panel-subtitle {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .panel-body {
+            padding: 18px;
+        }
+
+        .chart-box {
+            position: relative;
+
+            height: 320px;
+        }
+
+        .chart-box.small {
+            height: 300px;
+        }
+
+        /* =====================================================
+           WORKERS
+        ===================================================== */
+
+        .worker-list {
+            display: flex;
+            flex-direction: column;
+
+            gap: 9px;
+        }
+
+        .worker {
+            display: grid;
+
+            grid-template-columns:
+                minmax(180px, 1.5fr)
+                100px
+                100px
+                90px;
+
+            align-items: center;
+
+            gap: 12px;
+
+            padding: 13px;
+
+            border: 1px solid var(--border);
+
+            border-radius: 11px;
+
+            background:
+                rgba(255, 255, 255, 0.015);
+        }
+
+        .worker-name {
+            min-width: 0;
+
+            font-size: 13px;
+            font-weight: 600;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .worker-agent {
+            margin-top: 4px;
+
+            color: var(--muted);
+            font-size: 10px;
+
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .worker-hash {
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        .worker-region,
+        .worker-ip {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            width: fit-content;
+
+            padding: 5px 8px;
+
+            border-radius: 999px;
+
+            font-size: 10px;
+            font-weight: 650;
+
+            border: 1px solid transparent;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+
+            border-radius: 50%;
+        }
+
+        .status.online {
+            color: #bbf7d0;
+
+            background: rgba(34, 197, 94, 0.08);
+            border-color: rgba(34, 197, 94, 0.18);
+        }
+
+        .status.online .status-dot {
+            background: var(--green);
+        }
+
+        .status.offline {
+            color: #fecaca;
+
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.18);
+        }
+
+        .status.offline .status-dot {
+            background: var(--red);
+        }
+
+        .empty {
+            padding: 45px 20px;
+
+            text-align: center;
+
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        /* =====================================================
+           EVENT LOG
+        ===================================================== */
+
+        .event-table-wrap {
+            max-height: 320px;
+            overflow: auto;
+        }
+
+        .event-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .event-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            padding: 9px 10px;
+            background: var(--panel);
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 650;
+            text-transform: uppercase;
+        }
+
+        .event-table td {
+            padding: 10px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            vertical-align: top;
+        }
+
+        .event-time {
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .event-type {
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .event-row[data-type="system"] .event-type {
+            color: var(--purple);
+        }
+
+        .event-row[data-type="update"] .event-type {
+            color: var(--green);
+        }
+
+        .event-row[data-type="error"] .event-type {
+            color: var(--red);
+        }
+
+        .event-row[data-type="balance"] .event-type {
+            color: var(--cyan);
+        }
+
+        .event-message {
+            color: #cbd5e1;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .event-coin-logo {
+            width: 18px;
+            height: 18px;
+            margin-left: 5px;
+            object-fit: contain;
+            vertical-align: middle;
+        }
+
+        .event-table .empty {
+            padding: 24px 10px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        /* =====================================================
+           FOOTER
+        ===================================================== */
+
+        footer {
+            color: var(--muted);
+
+            text-align: center;
+
+            font-size: 11px;
+
+            padding: 15px 0 30px;
+        }
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 1100px) {
+
+            .stats {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+        @media (max-width: 700px) {
+
+            .container {
+                width: min(
+                    100% - 20px,
+                    1500px
+                );
+            }
+
+            .header-inner {
+                min-height: 62px;
+            }
+
+            .brand-subtitle {
+                display: none;
+            }
+
+            .connection {
+                padding: 7px 9px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .worker {
+                grid-template-columns:
+                    1fr 1fr;
+            }
+
+            .worker > :last-child {
+                justify-self: end;
+            }
+
+            .worker-region {
+                display: none;
+            }
+
+            .chart-box {
+                height: 260px;
+            }
+
+            .chart-box.small {
+                height: 250px;
+            }
+
+            .panel-body {
+                padding: 13px;
+            }
+
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="container header-inner">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                U
+            </div>
+
+            <div>
+                <div class="brand-title">
+                    Unmineable Monitor
+                </div>
+
+                <div class="brand-subtitle">
+                    Live mining dashboard
+                </div>
+            </div>
+
+        </div>
+
+        <div
+            id="connection"
+            class="connection"
+        >
+            <span class="connection-dot"></span>
+
+            <span id="connectionText">
+                Connecting...
+            </span>
+        </div>
+
+    </div>
+</header>
+
+
+<main>
+
+    <div class="container">
+
+        <div class="page-title">
+
+            <h1>
+                Mining Dashboard
+            </h1>
+
+            <p>
+                Real-time worker and hashrate monitoring
+            </p>
+
+        </div>
+
+
+        <!-- =================================================
+             STAT CARDS
+        ================================================== -->
+
+        <section class="stats">
+
+            <div class="stat-card">
+
+                <div class="stat-top">
+
+                    <div class="stat-label">
+                        Hashrate
+                    </div>
+
+                    <div class="stat-icon">
+                        ⚡
+                    </div>
+
+                </div>
+
+                <div
+                    id="hashrate"
+                    class="stat-value"
+                >
+                    0.00 H/s
+                </div>
+
+                <div class="stat-description">
+                    Combined worker hashrate
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-top">
+
+                    <div class="stat-label">
+                        Workers
+                    </div>
+
+                    <div class="stat-icon">
+                        ◉
+                    </div>
+
+                </div>
+
+                <div
+                    id="workers"
+                    class="stat-value"
+                >
+                    0 / 0
+                </div>
+
+                <div
+                    id="workerDescription"
+                    class="stat-description"
+                >
+                    0 online · 0 offline
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-top">
+
+                    <div class="stat-label">
+                        Balance
+                    </div>
+
+                    <div class="stat-icon">
+                        $
+                    </div>
+
+                </div>
+
+                <div
+                    id="balance"
+                    class="stat-value"
+                >
+                    —
+                </div>
+
+                <div class="stat-description">
+                    Current account balance
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-top">
+
+                    <div class="stat-label">
+                        Total Paid
+                    </div>
+
+                    <div class="stat-icon">
+                        ✓
+                    </div>
+
+                </div>
+
+                <div
+                    id="totalPaid"
+                    class="stat-value"
+                >
+                    —
+                </div>
+
+                <div class="stat-description">
+                    Lifetime payout
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             HASHRATE CHART + EVENTS
+        ================================================== -->
+
+        <section class="grid">
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <div class="panel-title">
+                            Live Hashrate
+                        </div>
+
+                        <div class="panel-subtitle">
+                            Real-time worker performance
+                        </div>
+                    </div>
+
+                    <div
+                        id="lastUpdate"
+                        class="panel-subtitle"
+                    >
+                        Waiting...
+                    </div>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div class="chart-box">
+                        <canvas id="hashrateChart"></canvas>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <div class="panel-title">
+                            Events
+                        </div>
+
+                        <div class="panel-subtitle">
+                            Live monitor activity
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div class="event-table-wrap">
+                        <table class="event-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">TIME</th>
+                                    <th scope="col">TYPE</th>
+                                    <th scope="col">EVENT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventList">
+                                <tr>
+                                    <td class="empty" colspan="3">
+                                        Waiting for events...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             WORKER CHART + WORKERS
+        ================================================== -->
+
+        <section class="grid">
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <div class="panel-title">
+                            Worker Hashrate
+                        </div>
+
+                        <div class="panel-subtitle">
+                            Hashrate per worker
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div class="chart-box small">
+                        <canvas id="workerChart"></canvas>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <div class="panel-title">
+                            Account
+                        </div>
+
+                        <div class="panel-subtitle">
+                            Unmineable account information
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="panel-body">
+
+                    <div
+                        id="accountInfo"
+                        class="empty"
+                    >
+                        Loading account...
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             WORKER TABLE
+        ================================================== -->
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <div class="panel-title">
+                        Workers
+                    </div>
+
+                    <div class="panel-subtitle">
+                        Connected mining workers
+                    </div>
+                </div>
+
+                <div
+                    id="workerCountLabel"
+                    class="panel-subtitle"
+                >
+                    0 workers
+                </div>
+
+            </div>
+
+            <div class="panel-body">
+
+                <div
+                    id="workerList"
+                    class="worker-list"
+                >
+                    <div class="empty">
+                        Loading workers...
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+
+    </div>
+
+</main>
+
+
+<footer>
+
+    Unmineable Monitor
+    ·
+    Live data
+    ·
+    In-memory monitoring
+
+</footer>
+
+
+<script>
+
+    // ========================================================
+    // GLOBAL STATE
+    // ========================================================
+
+    let hashrateChart = null;
+    let workerChart = null;
+
+    let reconnectTimer = null;
+
+
+    // ========================================================
+    // HELPERS
+    // ========================================================
+
+    function escapeHtml(value) {
+
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+
+    function formatHashrate(value) {
+
+        value = Number(value || 0);
+
+        if (value >= 1000000) {
+            return (
+                (value / 1000000).toFixed(2)
+                + " MH/s"
+            );
+        }
+
+        if (value >= 1000) {
+            return (
+                (value / 1000).toFixed(2)
+                + " kH/s"
+            );
+        }
+
+        return value.toFixed(2) + " H/s";
+    }
+
+
+    function formatNumber(value) {
+
+        const number = Number(value);
+
+        if (!Number.isFinite(number)) {
+            return "—";
+        }
+
+        return number.toLocaleString(
+            undefined,
+            {
+                maximumFractionDigits: 8
+            }
+        );
+    }
+
+
+    function formatTime(value) {
+
+        if (!value) {
+            return "—";
+        }
+
+        try {
+
+            const date = new Date(value);
+
+            return date.toLocaleTimeString();
+
+        } catch {
+            return value;
+        }
+    }
+
+
+    function formatDateTime(value) {
+
+        if (!value) {
+            return "—";
+        }
+
+        const date = new Date(value);
+
+        if (!Number.isFinite(date.getTime())) {
+            return String(value);
+        }
+
+        const pad = number =>
+            String(number).padStart(2, "0");
+
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+
+    // ========================================================
+    // CONNECTION UI
+    // ========================================================
+
+    function setConnection(status) {
+
+        const connection =
+            document.getElementById("connection");
+
+        const text =
+            document.getElementById("connectionText");
+
+        connection.classList.remove(
+            "connected",
+            "disconnected"
+        );
+
+        if (status === "connected") {
+
+            connection.classList.add(
+                "connected"
+            );
+
+            text.textContent =
+                "Connected";
+
+        } else if (status === "disconnected") {
+
+            connection.classList.add(
+                "disconnected"
+            );
+
+            text.textContent =
+                "Disconnected";
+
+        } else {
+
+            text.textContent =
+                "Connecting...";
+        }
+    }
+
+
+    // ========================================================
+    // HASHRATE CHART
+    // ========================================================
+
+    function initHashrateChart() {
+
+        const ctx =
+            document
+                .getElementById("hashrateChart")
+                .getContext("2d");
+
+        hashrateChart =
+            new Chart(ctx, {
+
+                type: "line",
+
+                data: {
+
+                    labels: [],
+
+                    datasets: [{
+                        label: "Hashrate",
+
+                        data: [],
+
+                        borderWidth: 2,
+
+                        pointRadius: 0,
+
+                        tension: 0.35,
+
+                        fill: true,
+
+                        backgroundColor:
+                            "rgba(59,130,246,0.10)",
+
+                        borderColor:
+                            "#3b82f6"
+                    }]
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    animation: false,
+
+                    interaction: {
+                        intersect: false,
+                        mode: "index"
+                    },
+
+                    plugins: {
+
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+                            callbacks: {
+
+                                label: function(context) {
+
+                                    return (
+                                        formatHashrate(
+                                            context.parsed.y
+                                        )
+                                    );
+                                }
+                            }
+                        }
+                    },
+
+                    scales: {
+
+                        x: {
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,0.04)"
+                            },
+
+                            ticks: {
+                                color: "#64748b",
+                                maxTicksLimit: 8
+                            }
+                        },
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,0.05)"
+                            },
+
+                            ticks: {
+
+                                color: "#64748b",
+
+                                callback: function(value) {
+                                    return formatHashrate(
+                                        value
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
+
+    function updateHashrateChart(history) {
+
+        if (!hashrateChart) {
+            return;
+        }
+
+        const points =
+            history || [];
+
+        hashrateChart.data.labels =
+            points.map(item =>
+                formatTime(
+                    new Date(item.time)
+                )
+            );
+
+        hashrateChart.data.datasets[0].data =
+            points.map(item =>
+                Number(item.value || 0)
+            );
+
+        hashrateChart.update("none");
+    }
+
+
+    // ========================================================
+    // WORKER CHART
+    // ========================================================
+
+    function initWorkerChart() {
+
+        const ctx =
+            document
+                .getElementById("workerChart")
+                .getContext("2d");
+
+        workerChart =
+            new Chart(ctx, {
+
+                type: "bar",
+
+                data: {
+
+                    labels: [],
+
+                    datasets: [{
+                        label: "Hashrate",
+
+                        data: [],
+
+                        borderWidth: 0,
+
+                        borderRadius: 5,
+
+                        backgroundColor:
+                            "rgba(139,92,246,0.75)"
+                    }]
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    animation: false,
+
+                    plugins: {
+
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+
+                            callbacks: {
+
+                                label: function(context) {
+
+                                    return (
+                                        formatHashrate(
+                                            context.parsed.y
+                                        )
+                                    );
+                                }
+                            }
+                        }
+                    },
+
+                    scales: {
+
+                        x: {
+
+                            grid: {
+                                display: false
+                            },
+
+                            ticks: {
+                                color: "#64748b"
+                            }
+                        },
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,0.05)"
+                            },
+
+                            ticks: {
+
+                                color: "#64748b",
+
+                                callback: function(value) {
+                                    return formatHashrate(
+                                        value
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+    }
+
+
+    function updateWorkerChart(workers) {
+
+        if (!workerChart) {
+            return;
+        }
+
+        const list =
+            workers || [];
+
+        workerChart.data.labels =
+            list.map(worker =>
+                worker.name || "unknown"
+            );
+
+        workerChart.data.datasets[0].data =
+            list.map(worker =>
+                Number(worker.hashrate || 0)
+            );
+
+        workerChart.update("none");
+    }
+
+
+    // ========================================================
+    // STATS
+    // ========================================================
+
+    function updateStats(data) {
+
+        const hashrate =
+            Number(data.hashrate || 0);
+
+        document
+            .getElementById("hashrate")
+            .textContent =
+                formatHashrate(hashrate);
+
+
+        const online =
+            Number(data.online_workers || 0);
+
+        const total =
+            Number(data.worker_count || 0);
+
+        const offline =
+            Number(data.offline_workers || 0);
+
+        document
+            .getElementById("workers")
+            .textContent =
+                `${online} / ${total}`;
+
+        document
+            .getElementById("workerDescription")
+            .textContent =
+                `${online} online · ${offline} offline`;
+
+
+        const balance =
+            data.balance;
+        const balanceAsset =
+            data.balance_asset
+                ? ` ${data.balance_asset}`
+                : "";
+
+        document
+            .getElementById("balance")
+            .textContent =
+                balance === null ||
+                balance === undefined
+                    ? "—"
+                    : `${formatNumber(balance)}${balanceAsset}`;
+
+
+        const totalPaid =
+            data.total_paid;
+
+        document
+            .getElementById("totalPaid")
+            .textContent =
+                totalPaid === null ||
+                totalPaid === undefined
+                    ? "—"
+                    : formatNumber(totalPaid);
+
+
+        document
+            .getElementById("lastUpdate")
+            .textContent =
+                data.last_update
+                    ? "Updated " +
+                      formatTime(data.last_update)
+                    : "Waiting...";
+    }
+
+
+    // ========================================================
+    // WORKERS
+    // ========================================================
+
+    function updateWorkers(workers) {
+
+        const container =
+            document.getElementById(
+                "workerList"
+            );
+
+        const list =
+            workers || [];
+
+        document
+            .getElementById(
+                "workerCountLabel"
+            )
+            .textContent =
+                `${list.length} worker${
+                    list.length === 1
+                        ? ""
+                        : "s"
+                }`;
+
+        if (!list.length) {
+            container.innerHTML =
+                `<div class="empty">No workers found</div>`;
+            return;
+        }
+
+        container.innerHTML = list.map(worker => {
+            const statusClass =
+                worker.online ? "online" : "offline";
+            const statusText =
+                worker.online ? "Online" : "Offline";
+
+            return `
+                <div class="worker">
+                    <div>
+                        <div class="worker-name">
+                            ${escapeHtml(worker.name || "Unknown worker")}
+                        </div>
+                        <div class="worker-agent">
+                            ${escapeHtml(worker.agent || "Unknown agent")}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="worker-hash">
+                            ${formatHashrate(worker.hashrate)}
+                        </div>
+                        <div class="worker-ip">
+                            ${escapeHtml(worker.ip || "—")}
+                        </div>
+                    </div>
+                    <div class="worker-region">
+                        ${escapeHtml(worker.region || "—")}
+                    </div>
+                    <div>
+                        <span class="status ${statusClass}">
+                            <span class="status-dot"></span>
+                            ${statusText}
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+
+    // ========================================================
+    // EVENTS
+    // ========================================================
+
+    function addEvent(event) {
+
+        const container =
+            document.getElementById(
+                "eventList"
+            );
+
+        const empty =
+            container.querySelector(
+                ".empty"
+            );
+
+        if (empty) {
+            empty.closest("tr").remove();
+        }
+
+        const row = document.createElement("tr");
+        const timeCell = document.createElement("td");
+        const typeCell = document.createElement("td");
+        const messageCell = document.createElement("td");
+        const eventType = event.type || "system";
+
+        row.className = "event-row";
+        row.dataset.type = eventType;
+        timeCell.className = "event-time";
+        typeCell.className = "event-type";
+        messageCell.className = "event-message";
+
+        timeCell.textContent = formatDateTime(event.time);
+        typeCell.textContent = eventType;
+        messageCell.textContent = event.message || "";
+
+        const logoUrl = event.data && event.data.coin_logo;
+        if (eventType === "balance" && logoUrl) {
+            try {
+                const parsedLogoUrl = new URL(logoUrl);
+                if (
+                    parsedLogoUrl.protocol === "https:" &&
+                    parsedLogoUrl.hostname === "unmineable.com"
+                ) {
+                    const logo = document.createElement("img");
+                    logo.className = "event-coin-logo";
+                    logo.src = parsedLogoUrl.href;
+                    logo.alt = `${event.data.coin || "Coin"} logo`;
+                    logo.loading = "lazy";
+                    messageCell.append(logo);
+                }
+            } catch (error) {}
+        }
+
+        row.append(timeCell, typeCell, messageCell);
+        container.prepend(row);
+
+        while (container.children.length > 100) {
+            container.lastElementChild.remove();
+        }
+    }
+
+
+    function loadEvents() {
+
+        fetch("/api/logs")
+
+            .then(response =>
+                response.json()
+            )
+
+            .then(result => {
+
+                if (
+                    !result ||
+                    !result.success
+                ) {
+                    return;
+                }
+
+
+                const container =
+                    document.getElementById(
+                        "eventList"
+                    );
+
+                container.innerHTML = "";
+
+
+                const list =
+                    result.events || [];
+
+
+                if (!list.length) {
+                    container.innerHTML =
+                        `<tr><td class="empty" colspan="3">
+                            Waiting for events...
+                        </td></tr>`;
+
+                    return;
+                }
+
+
+                list.forEach(addEvent);
+            })
+
+            .catch(() => {});
+    }
+
+
+    // ========================================================
+    // ACCOUNT
+    // ========================================================
+
+    function updateAccount(account) {
+
+        const container =
+            document.getElementById(
+                "accountInfo"
+            );
+
+
+        if (!account) {
+
+            container.innerHTML =
+                "No account data";
+
+            return;
+        }
+
+
+        const username =
+            account.username ||
+            "—";
+
+        const email =
+            account.email ||
+            "—";
+
+        const alias =
+            account.alias &&
+            account.alias.alias
+                ? account.alias.alias
+                : "—";
+
+
+        container.className = "";
+
+        container.innerHTML = `
+
+            <div
+                style="
+                    display:grid;
+                    gap:12px;
+                "
+            >
+
+                <div>
+                    <div
+                        style="
+                            color:#64748b;
+                            font-size:10px;
+                            text-transform:uppercase;
+                            letter-spacing:.6px;
+                        "
+                    >
+                        Username
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:14px;
+                            font-weight:650;
+                        "
+                    >
+                        ${escapeHtml(username)}
+                    </div>
+                </div>
+
+
+                <div>
+                    <div
+                        style="
+                            color:#64748b;
+                            font-size:10px;
+                            text-transform:uppercase;
+                            letter-spacing:.6px;
+                        "
+                    >
+                        Email
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:13px;
+                            color:#cbd5e1;
+                            word-break:break-word;
+                        "
+                    >
+                        ${escapeHtml(email)}
+                    </div>
+                </div>
+
+
+                <div>
+                    <div
+                        style="
+                            color:#64748b;
+                            font-size:10px;
+                            text-transform:uppercase;
+                            letter-spacing:.6px;
+                        "
+                    >
+                        Alias
+                    </div>
+
+                    <div
+                        style="
+                            margin-top:4px;
+                            font-size:13px;
+                            color:#cbd5e1;
+                        "
+                    >
+                        ${escapeHtml(alias)}
+                    </div>
+                </div>
+
+            </div>
+
+        `;
+    }
+
+
+    // ========================================================
+    // INITIAL DATA
+    // ========================================================
+
+    async function loadInitialData() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/status"
+                );
+
+            const data =
+                await response.json();
+
+
+            if (data.connected) {
+
+                setConnection(
+                    "connected"
+                );
+
+                updateStats(data);
+
+                updateAccount(
+                    data.account
+                );
+
+            }
+
+        } catch (error) {
+
+            setConnection(
+                "disconnected"
+            );
+        }
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/workers"
+                );
+
+            const data =
+                await response.json();
+
+            updateWorkers(
+                data.workers || []
+            );
+
+            updateWorkerChart(
+                data.workers || []
+            );
+
+        } catch (error) {}
+
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/history"
+                );
+
+            const data =
+                await response.json();
+
+            updateHashrateChart(
+                data.hashrate || []
+            );
+
+        } catch (error) {}
+
+
+        loadEvents();
+    }
+
+
+    // ========================================================
+    // SSE
+    // ========================================================
+
+    function connectSSE() {
+
+        setConnection(
+            "connecting"
+        );
+
+
+        const source =
+            new EventSource(
+                "/api/events"
+            );
+
+
+        source.onopen = function() {
+
+            setConnection(
+                "connected"
+            );
+
+            if (reconnectTimer) {
+
+                clearTimeout(
+                    reconnectTimer
+                );
+
+                reconnectTimer = null;
+            }
+        };
+
+
+        source.onmessage =
+            function(event) {
+
+                try {
+
+                    const payload =
+                        JSON.parse(
+                            event.data
+                        );
+
+
+                    if (
+                        payload.event ===
+                        "connected"
+                    ) {
+
+                        setConnection(
+                            "connected"
+                        );
+
+                        return;
+                    }
+
+
+                    if (
+                        payload.event ===
+                        "update"
+                    ) {
+
+                        const data =
+                            payload.data ||
+                            {};
+
+
+                        setConnection(
+                            "connected"
+                        );
+
+
+                        updateStats(data);
+
+                        updateWorkers(
+                            data.workers ||
+                            []
+                        );
+
+                        updateWorkerChart(
+                            data.workers ||
+                            []
+                        );
+
+                    }
+
+
+                    if (
+                        payload.event ===
+                        "log"
+                    ) {
+
+                        addEvent(
+                            payload.data || {}
+                        );
+
+                    }
+
+
+                    if (
+                        payload.event ===
+                        "error"
+                    ) {
+
+                        setConnection(
+                            "disconnected"
+                        );
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "SSE parse error:",
+                        error
+                    );
+                }
+            };
+
+
+        source.onerror =
+            function() {
+
+                setConnection(
+                    "disconnected"
+                );
+
+                source.close();
+
+
+                if (!reconnectTimer) {
+
+                    reconnectTimer =
+                        setTimeout(
+                            function() {
+
+                                reconnectTimer =
+                                    null;
+
+                                connectSSE();
+
+                            },
+                            3000
+                        );
+                }
+            };
+    }
+
+
+    // ========================================================
+    // REFRESH HISTORY
+    // ========================================================
+
+    async function refreshHistory() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/history"
+                );
+
+            const data =
+                await response.json();
+
+
+            updateHashrateChart(
+                data.hashrate || []
+            );
+
+        } catch (error) {}
+    }
+
+
+    // ========================================================
+    // START
+    // ========================================================
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        function() {
+
+            initHashrateChart();
+
+            initWorkerChart();
+
+            loadInitialData();
+
+            connectSSE();
+
+            setInterval(
+                refreshHistory,
+                10000
+            );
+
+        }
+    );
+
+</script>
+
+</body>
+</html>
