@@ -301,6 +301,13 @@ def get_dashboard_assets():
     )
 
 
+def get_asset_stats(coin):
+    return api_request(
+        "GET",
+        f"/v1/assets/{coin}/stats",
+    )
+
+
 def get_payments():
     return api_request(
         "GET",
@@ -401,7 +408,7 @@ def find_value(data, keys):
     return None
 
 
-def extract_miner_metrics(summary_response, assets_response):
+def extract_miner_metrics(summary_response, assets_response, asset_stats_response=None):
     assets_data = (
         assets_response.get("data", {})
         if isinstance(assets_response, dict)
@@ -426,6 +433,11 @@ def extract_miner_metrics(summary_response, assets_response):
         else {}
     )
     summary_raw = summary_data.get("raw", {}) if isinstance(summary_data, dict) else {}
+    stats_data = (
+        asset_stats_response.get("data", {})
+        if isinstance(asset_stats_response, dict)
+        else {}
+    )
     balance = find_value(asset, ("amount", "balance", "amount_mined"))
     if balance is None:
         balance = find_value(
@@ -459,9 +471,10 @@ def extract_miner_metrics(summary_response, assets_response):
         "reward_algorithm": asset.get("reward_algorithm"),
         "algorithm_count": summary_raw.get("algorithm_count"),
         "algorithm_hashrates": summary_raw.get("hr", {}),
-        "total_paid": find_value(
-            summary_response,
-            ("total_paid", "paid", "totalPaid"),
+        "total_paid": (
+            stats_data.get("paid")
+            if isinstance(stats_data, dict) and stats_data.get("paid") is not None
+            else find_value(summary_response, ("total_paid", "paid", "totalPaid"))
         ),
     }
 
@@ -747,6 +760,19 @@ def poll_unmineable():
                 summary_response,
                 assets_response,
             )
+            asset_stats_response = {}
+            if miner_metrics["balance_asset"]:
+                try:
+                    asset_stats_response = get_asset_stats(
+                        miner_metrics["balance_asset"]
+                    )
+                except Exception:
+                    pass
+                miner_metrics = extract_miner_metrics(
+                    summary_response,
+                    assets_response,
+                    asset_stats_response,
+                )
 
             # ------------------------------------------------
             # UPDATE STATE

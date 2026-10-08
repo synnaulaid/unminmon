@@ -11,6 +11,8 @@ Reference: <a href="https://unmineable.com/api"> https://unmineable.com/api</a>
 
 Compose uses `restart: unless-stopped`, so Docker restarts the container after a host reboot. On Linux, make sure the Docker service starts on boot with `sudo systemctl enable --now docker`. Do not run `docker compose down` if you want the service to remain configured for automatic restart.
 
+Compose defaults to Cloudflare and Google DNS for container name resolution. Override `DOCKER_DNS_1` and `DOCKER_DNS_2` in `.env` if your network requires custom resolvers.
+
 Check logs with `docker compose logs -f unminmon`. Dashboard history and events are held in memory and reset when the container restarts.
 
 ## Payout progress
